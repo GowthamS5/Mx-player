@@ -28,10 +28,10 @@ jobs:
         run: |
           flutter create mx_player_pro --platforms=android
           cd mx_player_pro
-          flutter pub add video_player file_picker
+          flutter pub add video_player "file_picker:^8.0.0"
           cp ../player.dart lib/main.dart
           
-          # build.gradle.kts ஃபைலில் உள்ள compileSdk மற்றும் targetSdk மதிப்புகளை சரியாக மாற்றுதல்
+          # build.gradle.kts ஃபைலில் உள்ள SDK பதிப்புகளை 36 ஆக மாற்ற
           python3 -c "
           path = 'android/app/build.gradle.kts'
           with open(path, 'r') as f:

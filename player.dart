@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
 
 void main() {
@@ -29,7 +28,7 @@ class MxApp extends StatelessWidget {
 class VItem {
   final String title, path, folder, size, tag;
   final bool isNet, isNew;
-  VItem(this.title, this.path, this.folder, this.size, {this.tag = '1080p', this.isNet = false, this.isNew = true});
+  VItem(this.title, this.path, this.folder, this.size, {this.tag = '1080p', this.isNet = true, this.isNew = true});
 }
 
 class MxHome extends StatefulWidget {
@@ -43,10 +42,10 @@ class _MxHomeState extends State<MxHome> {
   String? _curFolder;
 
   final List<VItem> _videos = [
-    VItem('Big_Buck_Bunny_1080p_BluRay.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', 'Movies', '158 MB', isNet: true),
-    VItem('Sintel_4K_Dolby_Dual_Audio.mkv', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', 'Movies', '412 MB', tag: '4K', isNet: true, isNew: false),
-    VItem('For_Bigger_Blazes_Status.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', 'WhatsApp Video', '14 MB', tag: '720p', isNet: true),
-    VItem('Elephants_Dream_Sample.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', 'Download', '84 MB', isNet: true),
+    VItem('Big_Buck_Bunny_1080p.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', 'Movies', '158 MB'),
+    VItem('Sintel_4K_Dolby.mkv', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', 'Movies', '412 MB', tag: '4K', isNew: false),
+    VItem('For_Bigger_Blazes.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', 'WhatsApp Video', '14 MB', tag: '720p'),
+    VItem('Elephants_Dream.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', 'Download', '84 MB'),
   ];
 
   Map<String, List<VItem>> get _folders {
@@ -57,28 +56,12 @@ class _MxHomeState extends State<MxHome> {
     return map;
   }
 
-  Future<void> _pickFiles() async {
-    final res = await FilePicker.platform.pickFiles(type: FileType.video, allowMultiple: true);
-    if (res != null) {
-      setState(() {
-        for (var f in res.files) {
-          if (f.path != null) {
-            final mb = '${(f.size / (1024 * 1024)).toStringAsFixed(1)} MB';
-            final parts = f.path!.split('/');
-            final fld = parts.length > 2 ? parts[parts.length - 2] : 'Internal Storage';
-            _videos.insert(0, VItem(f.name, f.path!, fld, mb, tag: 'LOCAL'));
-          }
-        }
-      });
-    }
-  }
-
   void _streamDialog() {
     final c = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Network Stream'),
+        title: const Text('Play Network Video (URL)'),
         content: TextField(controller: c, decoration: const InputDecoration(hintText: 'https://example.com/video.mp4')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
@@ -86,7 +69,7 @@ class _MxHomeState extends State<MxHome> {
             onPressed: () {
               if (c.text.trim().isNotEmpty) {
                 Navigator.pop(ctx);
-                _openPlayer(VItem('Network Stream', c.text.trim(), 'Stream', 'LIVE', isNet: true));
+                _openPlayer(VItem('Network Stream', c.text.trim(), 'Stream', 'LIVE'));
               }
             },
             child: const Text('PLAY'),
@@ -128,7 +111,7 @@ class _MxHomeState extends State<MxHome> {
                 const Text('Player', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
               ]),
         actions: [
-          IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: _pickFiles),
+          IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: _streamDialog),
           IconButton(icon: Icon(_grid ? Icons.view_list : Icons.grid_view, color: Colors.white), onPressed: () => setState(() => _grid = !_grid)),
           IconButton(icon: const Icon(Icons.cloud_queue, color: Colors.white), onPressed: _streamDialog),
           IconButton(icon: const Icon(Icons.brightness_6, color: Colors.white), onPressed: () => setState(() => _dark = !_dark)),
@@ -146,13 +129,13 @@ class _MxHomeState extends State<MxHome> {
         unselectedItemColor: sub,
         onTap: (i) {
           if (i == 0) setState(() => _curFolder = null);
-          if (i == 1) _pickFiles();
+          if (i == 1) _streamDialog();
           if (i == 2) _streamDialog();
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Local'),
-          BottomNavigationBarItem(icon: Icon(Icons.add_box), label: 'Add Videos'),
-          BottomNavigationBarItem(icon: Icon(Icons.cloud_queue), label: 'Stream'),
+          BottomNavigationBarItem(icon: Icon(Icons.play_circle), label: 'Stream'),
+          BottomNavigationBarItem(icon: Icon(Icons.cloud_queue), label: 'Network'),
         ],
       ),
     );
@@ -166,10 +149,7 @@ class _MxHomeState extends State<MxHome> {
         color: card,
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text('Folders (${list.length})', style: TextStyle(color: sub, fontWeight: FontWeight.bold, fontSize: 13)),
-          InkWell(
-            onTap: _pickFiles,
-            child: const Text('+ Select Phone Videos', style: TextStyle(color: Color(0xFF0057D9), fontWeight: FontWeight.bold, fontSize: 13)),
-          ),
+          const Text('Ad-Free MX UI', style: TextStyle(color: Color(0xFF0057D9), fontWeight: FontWeight.bold, fontSize: 13)),
         ]),
       ),
       Expanded(
@@ -259,7 +239,7 @@ class _MxPlayerScreenState extends State<MxPlayerScreen> {
   void initState() {
     super.initState();
     _setOrient(true);
-    _ctrl = widget.video.isNet ? VideoPlayerController.networkUrl(Uri.parse(widget.video.path)) : VideoPlayerController.file(File(widget.video.path));
+    _ctrl = VideoPlayerController.networkUrl(Uri.parse(widget.video.path));
     _ctrl.initialize().then((_) {
       _ctrl.play();
       _ctrl.addListener(() {

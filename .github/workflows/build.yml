@@ -31,10 +31,11 @@ jobs:
           flutter pub add video_player file_picker
           cp ../player.dart lib/main.dart
           
-          # build.gradle.kts அல்லது build.gradle-ல் உள்ள compileSdk மதிப்பை 36 ஆக மாற்ற
-          find android/app -name "build.gradle*" -exec sed -i 's/flutter.compileSdkVersion/36/g' {} +
-          find android/app -name "build.gradle*" -exec sed -i 's/compileSdk = [0-9]*/compileSdk = 36/g' {} +
-          find android/app -name "build.gradle*" -exec sed -i 's/compileSdk [0-9]*/compileSdk 36/g' {} +
+          # build.gradle.kts ஃபைலில் compileSdk மதிப்பை துல்லியமாக 36 ஆக மாற்ற
+          sed -i 's/.*/compileSdk = 36/' android/app/build.gradle.kts || true
+          # ஒருவேளை build.gradle ஃபைல் இருந்தால் அதையும் மாற்ற
+          find android/app -name "build.gradle" -exec sed -i 's/compileSdk.*/compileSdk 36/' {} + || true
+          find android/app -name "build.gradle" -exec sed -i 's/compileSdkVersion.*/compileSdkVersion 36/' {} + || true
 
       - name: Build Release APK
         working-directory: ./mx_player_pro
@@ -45,4 +46,3 @@ jobs:
         with:
           name: MX-Player-Pro-NoAds-APK
           path: mx_player_pro/build/app/outputs/flutter-apk/app-release.apk
-          

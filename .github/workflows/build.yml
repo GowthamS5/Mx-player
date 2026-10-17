@@ -28,21 +28,8 @@ jobs:
         run: |
           flutter create mx_player_pro --platforms=android
           cd mx_player_pro
-          flutter pub add video_player "file_picker:^8.0.0"
+          flutter pub add video_player
           cp ../player.dart lib/main.dart
-          
-          # build.gradle.kts ஃபைலில் உள்ள SDK பதிப்புகளை 36 ஆக மாற்ற
-          python3 -c "
-          path = 'android/app/build.gradle.kts'
-          with open(path, 'r') as f:
-              content = f.read()
-          content = content.replace('flutter.compileSdkVersion.toInt()', '36')
-          content = content.replace('flutter.targetSdkVersion.toInt()', '36')
-          content = content.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
-          content = content.replace('targetSdk = flutter.targetSdkVersion', 'targetSdk = 36')
-          with open(path, 'w') as f:
-              f.write(content)
-          "
 
       - name: Build Release APK
         working-directory: ./mx_player_pro
@@ -53,3 +40,4 @@ jobs:
         with:
           name: MX-Player-Pro-NoAds-APK
           path: mx_player_pro/build/app/outputs/flutter-apk/app-release.apk
+          

@@ -30,10 +30,14 @@ jobs:
           cd mx_player_pro
           flutter pub add video_player file_picker
           cp ../player.dart lib/main.dart
+          
+          # android/app/build.gradle அல்லது build.gradle.kts ஃபைலில் compileSdk-வை 36 ஆக மாற்ற
+          find android/app -name "build.gradle*" -exec sed -i 's/compileSdk [0-9]*/compileSdk 36/g' {} +
+          find android/app -name "build.gradle*" -exec sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 36/g' {} +
 
       - name: Build Release APK
         working-directory: ./mx_player_pro
-        run: flutter build apk --release --compile-sdk 36
+        run: flutter build apk --release
 
       - name: Upload MX Player APK
         uses: actions/upload-artifact@v4

@@ -28,7 +28,7 @@ jobs:
         run: |
           flutter create mx_player_pro --platforms=android
           cd mx_player_pro
-          flutter pub add video_player "file_picker:^5.3.3"
+          flutter pub add video_player
           cp ../player.dart lib/main.dart
 
       - name: Build Release APK

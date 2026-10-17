@@ -1,4 +1,3 @@
-
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -59,7 +58,7 @@ class _MxHomeState extends State<MxHome> {
   }
 
   Future<void> _pickFiles() async {
-    final res = await FilePicker.pickFiles(type: FileType.video, allowMultiple: true);
+    final res = await FilePicker.platform.pickFiles(type: FileType.video, allowMultiple: true);
     if (res != null) {
       setState(() {
         for (var f in res.files) {

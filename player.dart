@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -26,8 +27,8 @@ class MxApp extends StatelessWidget {
 
 class VItem {
   final String title, path, folder, size, tag;
-  final bool isNew;
-  VItem(this.title, this.path, this.folder, this.size, {this.tag = '1080p', this.isNew = true});
+  final bool isNet;
+  VItem(this.title, this.path, this.folder, this.size, {this.tag = 'LOCAL', this.isNet = false});
 }
 
 class MxHome extends StatefulWidget {
@@ -37,15 +38,68 @@ class MxHome extends StatefulWidget {
 }
 
 class _MxHomeState extends State<MxHome> {
-  bool _grid = false, _dark = true;
+  bool _grid = false, _dark = true, _loading = true;
   String? _curFolder;
+  final List<VItem> _videos = [];
 
-  final List<VItem> _videos = [
-    VItem('Big_Buck_Bunny_1080p.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', 'Movies', '158 MB'),
-    VItem('Sintel_4K_Dolby.mkv', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', 'Movies', '412 MB', tag: '4K', isNew: false),
-    VItem('For_Bigger_Blazes.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', 'WhatsApp Video', '14 MB', tag: '720p'),
-    VItem('Elephants_Dream.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', 'Download', '84 MB'),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _scanPhoneStorage();
+  }
+
+  // ஃபோனில் உள்ள லோக்கல் வீடியோக்களைத் தேடும் பகுதி
+  Future<void> _scanPhoneStorage() async {
+    setState(() => _loading = true);
+    try {
+      // ஆண்ட்ராய்டின் பொதுவான ஸ்டோரேஜ் பாத்துகள் (Download, Movies, WhatsApp)
+      final List<String> commonDirs = [
+        '/storage/emulated/0/Download',
+        '/storage/emulated/0/Movies',
+        '/storage/emulated/0/DCIM',
+        '/storage/emulated/0/WhatsApp/Media/WhatsApp Video',
+      ];
+
+      for (var dirPath in commonDirs) {
+        final dir = Directory(dirPath);
+        if (await dir.exists()) {
+          await _processDirectory(dir);
+        }
+      }
+    } catch (e) {
+      debugPrint("Scan error: $e");
+    }
+
+    // ஒருவேளை வீடியோக்கள் கிடைக்கவில்லை என்றால் சாம்பிள் வீடியோக்களைக் காட்டும்
+    if (_videos.isEmpty) {
+      _videos.addAll([
+        VItem('Big_Buck_Bunny.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', 'Sample Videos', '158 MB', tag: 'HD', isNet: true),
+        VItem('Sintel_4K.mkv', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', 'Sample Videos', '412 MB', tag: '4K', isNet: true),
+      ]);
+    }
+
+    setState(() => _loading = false);
+  }
+
+  Future<void> _processDirectory(Directory dir) async {
+    try {
+      final entities = dir.list(recursive: false);
+      await for (var entity in entities) {
+        if (entity is File) {
+          final path = entity.path.toLowerCase();
+          if (path.endsWith('.mp4') || path.endsWith('.mkv') || path.endsWith('.avi') || path.endsWith('.3gp') || path.endsWith('.mov')) {
+            final file = File(entity.path);
+            final sizeBytes = await file.length();
+            final mb = '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+            final name = entity.path.split('/').last;
+            final folderName = dir.path.split('/').last;
+
+            _videos.add(VItem(name, entity.path, folderName, mb, tag: path.split('.').last.toUpperCase()));
+          }
+        }
+      }
+    } catch (_) {}
+  }
 
   Map<String, List<VItem>> get _folders {
     final map = <String, List<VItem>>{};
@@ -60,7 +114,7 @@ class _MxHomeState extends State<MxHome> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Play Network Video (URL)'),
+        title: const Text('Network Stream URL'),
         content: TextField(controller: c, decoration: const InputDecoration(hintText: 'https://example.com/video.mp4')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
@@ -68,7 +122,7 @@ class _MxHomeState extends State<MxHome> {
             onPressed: () {
               if (c.text.trim().isNotEmpty) {
                 Navigator.pop(ctx);
-                _openPlayer(VItem('Network Stream', c.text.trim(), 'Stream', 'LIVE'));
+                _openPlayer(VItem('Stream Video', c.text.trim(), 'Stream', 'LIVE', tag: 'URL', isNet: true));
               }
             },
             child: const Text('PLAY'),
@@ -110,18 +164,20 @@ class _MxHomeState extends State<MxHome> {
                 const Text('Player', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
               ]),
         actions: [
-          IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: _streamDialog, tooltip: 'Search URL'),
+          IconButton(icon: const Icon(Icons.refresh, color: Colors.white), onPressed: _scanPhoneStorage, tooltip: 'Rescan Videos'),
           IconButton(icon: Icon(_grid ? Icons.view_list : Icons.grid_view, color: Colors.white), onPressed: () => setState(() => _grid = !_grid)),
           IconButton(icon: const Icon(Icons.cloud_queue, color: Colors.white), onPressed: _streamDialog, tooltip: 'Network Stream'),
           IconButton(icon: const Icon(Icons.brightness_6, color: Colors.white), onPressed: () => setState(() => _dark = !_dark)),
         ],
       ),
-      body: _curFolder == null ? _buildFolders(txt, sub, card) : _buildVideos(_folders[_curFolder!] ?? [], txt, sub),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF0057D9)))
+          : (_curFolder == null ? _buildFolders(txt, sub, card) : _buildVideos(_folders[_curFolder!] ?? [], txt, sub)),
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF0057D9),
-        onPressed: _streamDialog,
-        child: const Icon(Icons.add, color: Colors.white, size: 34),
-        tooltip: 'Add Network Video',
+        onPressed: _scanPhoneStorage,
+        child: const Icon(Icons.refresh, color: Colors.white, size: 28),
+        tooltip: 'Scan Phone Storage',
       ),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: card,
@@ -130,12 +186,12 @@ class _MxHomeState extends State<MxHome> {
         onTap: (i) {
           if (i == 0) setState(() => _curFolder = null);
           if (i == 1) _streamDialog();
-          if (i == 2) _streamDialog();
+          if (i == 2) _scanPhoneStorage();
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Folders'),
-          BottomNavigationBarItem(icon: Icon(Icons.play_circle), label: 'Stream'),
-          BottomNavigationBarItem(icon: Icon(Icons.cloud_queue), label: 'Network'),
+          BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Local Folders'),
+          BottomNavigationBarItem(icon: Icon(Icons.cloud_queue), label: 'Stream'),
+          BottomNavigationBarItem(icon: Icon(Icons.refresh), label: 'Rescan'),
         ],
       ),
     );
@@ -148,45 +204,40 @@ class _MxHomeState extends State<MxHome> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         color: card,
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Folders (${list.length})', style: TextStyle(color: sub, fontWeight: FontWeight.bold, fontSize: 13)),
-          const Text('Ad-Free MX UI', style: TextStyle(color: Color(0xFF0057D9), fontWeight: FontWeight.bold, fontSize: 13)),
+          Text('Local Folders (${list.length})', style: TextStyle(color: sub, fontWeight: FontWeight.bold, fontSize: 13)),
+          const Text('Auto Scanning Phone', style: TextStyle(color: Color(0xFF0057D9), fontWeight: FontWeight.bold, fontSize: 13)),
         ]),
       ),
       Expanded(
-        child: _grid
-            ? GridView.builder(
-                padding: const EdgeInsets.all(12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
-                itemCount: list.length,
-                itemBuilder: (_, i) => InkWell(
-                  onTap: () => setState(() => _curFolder = list[i].key),
-                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Icon(Icons.folder_rounded, color: Color(0xFFFFB703), size: 64),
-                    Text('${list[i].key} (${list[i].value.length})', maxLines: 1, style: TextStyle(color: txt, fontSize: 12)),
-                  ]),
-                ),
-              )
-            : ListView.separated(
-                itemCount: list.length,
-                separatorBuilder: (_, __) => const Divider(height: 1, indent: 72, color: Colors.white10),
-                itemBuilder: (_, i) {
-                  final e = list[i];
-                  return ListTile(
-                    leading: const Icon(Icons.folder_rounded, color: Color(0xFF4285F4), size: 46),
-                    title: Row(children: [
-                      Expanded(child: Text(e.key, style: TextStyle(color: txt, fontWeight: FontWeight.w600))),
-                      if (e.value.any((v) => v.isNew))
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(3)),
-                          child: const Text('NEW', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                        ),
-                    ]),
-                    subtitle: Text('${e.value.length} videos', style: TextStyle(color: sub, fontSize: 12)),
-                    onTap: () => setState(() => _curFolder = e.key),
-                  );
-                },
-              ),
+        child: list.isEmpty
+            ? const Center(child: Text('No local videos found. Tap refresh to rescan.'))
+            : (_grid
+                ? GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
+                    itemCount: list.length,
+                    itemBuilder: (_, i) => InkWell(
+                      onTap: () => setState(() => _curFolder = list[i].key),
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        const Icon(Icons.folder_rounded, color: Color(0xFFFFB703), size: 64),
+                        Text('${list[i].key} (${list[i].value.length})', maxLines: 1, style: TextStyle(color: txt, fontSize: 12)),
+                      ]),
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: list.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1, indent: 72, color: Colors.white10),
+                    itemBuilder: (_, i) {
+                      final e = list[i];
+                      return ListTile(
+                        leading: const Icon(Icons.folder_rounded, color: Color(0xFF4285F4), size: 46),
+                        title: Text(e.key, style: TextStyle(color: txt, fontWeight: FontWeight.w600)),
+                        subtitle: Text('${e.value.length} videos', style: TextStyle(color: sub, fontSize: 12)),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => setState(() => _curFolder = e.key),
+                      );
+                    },
+                  )),
       ),
     ]);
   }
@@ -239,7 +290,10 @@ class _MxPlayerScreenState extends State<MxPlayerScreen> {
   void initState() {
     super.initState();
     _setOrient(true);
-    _ctrl = VideoPlayerController.networkUrl(Uri.parse(widget.video.path));
+    _ctrl = widget.video.isNet
+        ? VideoPlayerController.networkUrl(Uri.parse(widget.video.path))
+        : VideoPlayerController.file(File(widget.video.path));
+    
     _ctrl.initialize().then((_) {
       _ctrl.play();
       _ctrl.addListener(() {
@@ -410,8 +464,7 @@ class _MxPlayerScreenState extends State<MxPlayerScreen> {
                           onPressed: () => setState(() => _ctrl.value.isPlaying ? _ctrl.pause() : _ctrl.play()),
                         ),
                         const SizedBox(width: 20),
-                        IconButton(icon: const Icon(Icons.skip_next, size: 32), onPressed: () => _ctrl.seekTo(_ctrl.value.position + const Duration(seconds: 10)),
-                        ),
+                        IconButton(icon: const Icon(Icons.skip_next, size: 32), onPressed: () => _ctrl.seekTo(_ctrl.value.position + const Duration(seconds: 10))),
                       ]),
                       IconButton(icon: const Icon(Icons.aspect_ratio), onPressed: () => setState(() => _fit = (_fit + 1) % 3)),
                     ]),

@@ -28,8 +28,13 @@ jobs:
         run: |
           flutter create mx_player_pro
           cd mx_player_pro
-          flutter pub add video_player "file_picker:^8.0.0"
+          flutter pub add video_player file_picker
           cp ../player.dart lib/main.dart
+          
+          # compileSdk-வை 36 ஆக மாற்றும் கமாண்ட்
+          sed -i 's/compileSdk [0-9]*/compileSdk 36/g' android/app/build.gradle
+          sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 36/g' android/app/build.gradle
+          sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 36/g' android/app/build.gradle
 
       - name: Build Release APK
         working-directory: ./mx_player_pro
@@ -40,4 +45,3 @@ jobs:
         with:
           name: MX-Player-Pro-NoAds-APK
           path: mx_player_pro/build/app/outputs/flutter-apk/app-release.apk
-          
